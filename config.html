@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuração de Preços - Calculadora de Orçamento</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .save-indicator {
+            transition: all 0.3s ease;
+        }
+        .save-indicator.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .save-indicator.hide {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-4xl">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-teal-800">Configuração de Preços</h1>
+            <p class="mt-2 text-lg text-stone-600">Altere os valores das variáveis utilizadas na calculadora de orçamento</p>
+            <div class="mt-4">
+                <a href="inde.html" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition">
+                    ← Voltar para Calculadora
+                </a>
+            </div>
+        </header>
+
+        <!-- Indicador de salvamento -->
+        <div id="saveIndicator" class="save-indicator hide fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+            Configurações salvas!
+        </div>
+
+        <main class="space-y-8">
+            
+            <!-- Preços Base dos Projetos -->
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                <h2 class="text-2xl font-bold text-stone-800 mb-6">Preços Base dos Projetos</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label for="nonePrice" class="block text-sm font-medium text-stone-700 mb-1">Nenhum/Personalizado (R$)</label>
+                        <input type="number" id="nonePrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="pagePrice" class="block text-sm font-medium text-stone-700 mb-1">Página Web (R$)</label>
+                        <input type="number" id="pagePrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="appPrice" class="block text-sm font-medium text-stone-700 mb-1">Aplicação Web (R$)</label>
+                        <input type="number" id="appPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preços por Componente -->
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                <h2 class="text-2xl font-bold text-stone-800 mb-6">Preços por Componente</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div>
+                        <label for="backendPrice" class="block text-sm font-medium text-stone-700 mb-1">Back-end (por nível) (R$)</label>
+                        <input type="number" id="backendPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="perPagePrice" class="block text-sm font-medium text-stone-700 mb-1">Por Página Adicional (R$)</label>
+                        <input type="number" id="perPagePrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="complexityPrice" class="block text-sm font-medium text-stone-700 mb-1">Complexidade (por nível) (R$)</label>
+                        <input type="number" id="complexityPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preços de Segurança -->
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                <h2 class="text-2xl font-bold text-stone-800 mb-6">Preços de Segurança</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="securitySimplePrice" class="block text-sm font-medium text-stone-700 mb-1">Segurança Simples (R$)</label>
+                        <input type="number" id="securitySimplePrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="securityProfessionalPrice" class="block text-sm font-medium text-stone-700 mb-1">Segurança Profissional (R$)</label>
+                        <input type="number" id="securityProfessionalPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recursos Adicionais -->
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                <h2 class="text-2xl font-bold text-stone-800 mb-6">Recursos Adicionais</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div>
+                        <label for="databasePrice" class="block text-sm font-medium text-stone-700 mb-1">Banco de Dados (R$)</label>
+                        <input type="number" id="databasePrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="seoPrice" class="block text-sm font-medium text-stone-700 mb-1">SEO Otimizado (R$)</label>
+                        <input type="number" id="seoPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="integrationsPrice" class="block text-sm font-medium text-stone-700 mb-1">Integrações (APIs) (R$)</label>
+                        <input type="number" id="integrationsPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="copywritingPrice" class="block text-sm font-medium text-stone-700 mb-1">Copywriting (R$)</label>
+                        <input type="number" id="copywritingPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="designPrice" class="block text-sm font-medium text-stone-700 mb-1">Design Exclusivo (R$)</label>
+                        <input type="number" id="designPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                    <div>
+                        <label for="urgencyPrice" class="block text-sm font-medium text-stone-700 mb-1">Urgência (R$)</label>
+                        <input type="number" id="urgencyPrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manutenção -->
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                <h2 class="text-2xl font-bold text-stone-800 mb-6">Manutenção</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="maintenancePrice" class="block text-sm font-medium text-stone-700 mb-1">Manutenção Mensal (R$)</label>
+                        <input type="number" id="maintenancePrice" min="0" step="50" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button id="saveBtn" class="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-medium">
+                        Salvar Configurações
+                    </button>
+                    <button id="resetBtn" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+                        Restaurar Padrões
+                    </button>
+                    <button id="exportBtn" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                        Exportar Configurações
+                    </button>
+                    <input type="file" id="importInput" accept=".json" style="display: none;">
+                    <button id="importBtn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
+                        Importar Configurações
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Valores padrão
+        const defaultPrices = {
+            projectType: { none: 0, page: 3500, app: 5000 },
+            backend: 2500,
+            database: 800,
+            security: { Profissional: 1500, Simples: 750 },
+            perPage: 800,
+            complexity: 1200,
+            seo: 1200,
+            integrations: 1000,
+            copywriting: 1500, 
+            design: 2000,
+            urgency: 700,
+            maintenance: 750
+        };
+
+        // Elementos do DOM
+        const elements = {
+            nonePrice: document.getElementById('nonePrice'),
+            pagePrice: document.getElementById('pagePrice'),
+            appPrice: document.getElementById('appPrice'),
+            backendPrice: document.getElementById('backendPrice'),
+            perPagePrice: document.getElementById('perPagePrice'),
+            complexityPrice: document.getElementById('complexityPrice'),
+            securitySimplePrice: document.getElementById('securitySimplePrice'),
+            securityProfessionalPrice: document.getElementById('securityProfessionalPrice'),
+            databasePrice: document.getElementById('databasePrice'),
+            seoPrice: document.getElementById('seoPrice'),
+            integrationsPrice: document.getElementById('integrationsPrice'),
+            copywritingPrice: document.getElementById('copywritingPrice'),
+            designPrice: document.getElementById('designPrice'),
+            urgencyPrice: document.getElementById('urgencyPrice'),
+            maintenancePrice: document.getElementById('maintenancePrice'),
+            saveBtn: document.getElementById('saveBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            exportBtn: document.getElementById('exportBtn'),
+            importBtn: document.getElementById('importBtn'),
+            importInput: document.getElementById('importInput'),
+            saveIndicator: document.getElementById('saveIndicator')
+        };
+
+        // Carregar valores salvos ou padrões
+        function loadPrices() {
+            const savedPrices = localStorage.getItem('calculatorPrices');
+            const prices = savedPrices ? JSON.parse(savedPrices) : defaultPrices;
+
+            elements.nonePrice.value = prices.projectType.none || 0;
+            elements.pagePrice.value = prices.projectType.page;
+            elements.appPrice.value = prices.projectType.app;
+            elements.backendPrice.value = prices.backend;
+            elements.perPagePrice.value = prices.perPage;
+            elements.complexityPrice.value = prices.complexity;
+            elements.securitySimplePrice.value = prices.security.Simples;
+            elements.securityProfessionalPrice.value = prices.security.Profissional;
+            elements.databasePrice.value = prices.database;
+            elements.seoPrice.value = prices.seo;
+            elements.integrationsPrice.value = prices.integrations;
+            elements.copywritingPrice.value = prices.copywriting;
+            elements.designPrice.value = prices.design;
+            elements.urgencyPrice.value = prices.urgency;
+            elements.maintenancePrice.value = prices.maintenance;
+        }
+
+        // Coletar valores dos inputs
+        function collectPrices() {
+            return {
+                projectType: { 
+                    none: parseInt(elements.nonePrice.value) || 0,
+                    page: parseInt(elements.pagePrice.value) || 0, 
+                    app: parseInt(elements.appPrice.value) || 0 
+                },
+                backend: parseInt(elements.backendPrice.value) || 0,
+                database: parseInt(elements.databasePrice.value) || 0,
+                security: { 
+                    Profissional: parseInt(elements.securityProfessionalPrice.value) || 0, 
+                    Simples: parseInt(elements.securitySimplePrice.value) || 0 
+                },
+                perPage: parseInt(elements.perPagePrice.value) || 0,
+                complexity: parseInt(elements.complexityPrice.value) || 0,
+                seo: parseInt(elements.seoPrice.value) || 0,
+                integrations: parseInt(elements.integrationsPrice.value) || 0,
+                copywriting: parseInt(elements.copywritingPrice.value) || 0,
+                design: parseInt(elements.designPrice.value) || 0,
+                urgency: parseInt(elements.urgencyPrice.value) || 0,
+                maintenance: parseInt(elements.maintenancePrice.value) || 0
+            };
+        }
+
+        // Salvar configurações
+        function savePrices() {
+            const prices = collectPrices();
+            localStorage.setItem('calculatorPrices', JSON.stringify(prices));
+            showSaveIndicator();
+        }
+
+        // Mostrar indicador de salvamento
+        function showSaveIndicator() {
+            elements.saveIndicator.classList.remove('hide');
+            elements.saveIndicator.classList.add('show');
+            
+            setTimeout(() => {
+                elements.saveIndicator.classList.remove('show');
+                elements.saveIndicator.classList.add('hide');
+            }, 2000);
+        }
+
+        // Restaurar valores padrão
+        function resetToDefaults() {
+            if (confirm('Tem certeza de que deseja restaurar todos os valores para os padrões? Esta ação não pode ser desfeita.')) {
+                localStorage.removeItem('calculatorPrices');
+                loadPrices();
+                showSaveIndicator();
+            }
+        }
+
+        // Exportar configurações
+        function exportConfig() {
+            const prices = collectPrices();
+            const dataStr = JSON.stringify(prices, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'configuracoes-precos.json';
+            link.click();
+        }
+
+        // Importar configurações
+        function importConfig() {
+            elements.importInput.click();
+        }
+
+        // Processar arquivo importado
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedPrices = JSON.parse(e.target.result);
+                    
+                    // Validar estrutura do arquivo
+                    if (importedPrices.projectType && importedPrices.backend !== undefined) {
+                        localStorage.setItem('calculatorPrices', JSON.stringify(importedPrices));
+                        loadPrices();
+                        showSaveIndicator();
+                    } else {
+                        alert('Arquivo de configuração inválido. Verifique a estrutura do arquivo.');
+                    }
+                } catch (error) {
+                    alert('Erro ao ler o arquivo. Verifique se é um arquivo JSON válido.');
+                }
+            };
+            reader.readAsText(file);
+            
+            // Limpar o input para permitir selecionar o mesmo arquivo novamente
+            event.target.value = '';
+        }
+
+        // Auto-save quando houver mudanças
+        function setupAutoSave() {
+            Object.values(elements).forEach(element => {
+                if (element.type === 'number') {
+                    element.addEventListener('input', savePrices);
+                }
+            });
+        }
+
+        // Event listeners
+        elements.saveBtn.addEventListener('click', savePrices);
+        elements.resetBtn.addEventListener('click', resetToDefaults);
+        elements.exportBtn.addEventListener('click', exportConfig);
+        elements.importBtn.addEventListener('click', importConfig);
+        elements.importInput.addEventListener('change', handleFileImport);
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPrices();
+            setupAutoSave();
+        });
+    </script>
+
+</body>
+</html>
