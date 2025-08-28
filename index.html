@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Interativa de Orçamento de Projetos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals with Teal Accent -->
+    <!-- Application Structure Plan: A two-column layout was chosen for optimal user experience. The left column contains all interactive controls (configurator), allowing users to define project specifications. The right column displays the results in real-time (total estimated value and a cost breakdown chart). This task-oriented structure is intuitive for a calculator, providing immediate feedback and clarifying how each option impacts the final budget without needing to scroll or navigate. -->
+    <!-- Visualization & Content Choices: Project variables are converted into interactive elements like sliders and toggles for a more engaging user experience. The primary output is the total cost, displayed prominently. A dynamic donut chart (Chart.js) was chosen to visualize the cost breakdown by category (e.g., Base, Back-end, Add-ons). This goal is to inform and compare, showing the proportion of each component, which is more insightful than a single final number. This structure provides a clear, interactive narrative of the project's cost. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 450px;
+        }
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 300px;
+                max-height: 350px;
+            }
+        }
+        /* Custom Toggle Switch Styles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #0d9488;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #0d9488;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-teal-800">Calculadora de Orçamento de Projetos</h1>
+            <p class="mt-2 text-lg text-stone-600">Uma ferramenta interativa para estimar os custos do seu projeto web.</p>
+            <div class="mt-4">
+                <a href="config.html" class="inline-flex items-center px-4 py-2 bg-stone-600 text-white rounded-lg hover:bg-stone-700 transition text-sm">
+                    ⚙️ Configurar Preços
+                </a>
+            </div>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+            
+            <!-- Coluna de Configuração -->
+            <div id="configurator" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-stone-800">1. Detalhes do Projeto</h2>
+                    <p class="text-stone-500 mt-1">Configure as especificações para obter uma estimativa em tempo real. Cada opção selecionada ajustará o valor total ao lado.</p>
+                </div>
+
+                <form id="projectForm" class="space-y-6">
+                    
+                    <div>
+                        <label for="projectType" class="block text-sm font-medium text-stone-700 mb-1">Tipo de Projeto</label>
+                        <select id="projectType" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                            <option value="none">Nenhum (Custo Base Zero)</option>
+                            <option value="page">Página Web</option>
+                            <option value="app">Aplicação Web</option>
+                        </select>
+                    </div>
+
+                    <div id="pageTypeWrapper" style="display: none;">
+                        <label for="pageType" class="block text-sm font-medium text-stone-700 mb-1">Tipo de Página</label>
+                        <select id="pageType" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                            <option value="Simples">Simples</option>
+                            <option value="Profissional">Profissional</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-stone-50 p-3 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-stone-700">Incluir Segurança</span>
+                            <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                <input type="checkbox" name="includeSecurity" id="includeSecurity" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                <label for="includeSecurity" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="securityLevel" class="block text-xs text-stone-600">Nível: <span id="securityLevelValue" class="font-bold text-teal-700">1</span></label>
+                            <input id="securityLevel" type="range" min="0" max="5" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                            <div class="text-xs text-stone-500 mt-1">0 = Básica, 5 = Máxima segurança</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="backend" class="block text-sm font-medium text-stone-700">Nível do Back-end: <span id="backendValue" class="font-bold text-teal-700">0</span></label>
+                        <input id="backend" type="range" min="0" max="3" value="0" class="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                        <div class="text-xs text-stone-500 mt-1">0 = Sem back-end, 1 = Básico, 2 = Intermediário, 3 = Avançado</div>
+                    </div>
+
+                    <div>
+                        <label for="pages" class="block text-sm font-medium text-stone-700">Número de Páginas: <span id="pagesValue" class="font-bold text-teal-700">0</span></label>
+                        <input id="pages" type="range" min="0" max="10" value="0" class="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                        <div class="text-xs text-stone-500 mt-1">0 = Apenas página principal</div>
+                    </div>
+
+                    <div>
+                        <label for="complexity" class="block text-sm font-medium text-stone-700">Complexidade (0-5): <span id="complexityValue" class="font-bold text-teal-700">0</span></label>
+                        <input id="complexity" type="range" min="0" max="5" value="0" class="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                        <div class="text-xs text-stone-500 mt-1">0 = Projeto simples, 5 = Altamente complexo</div>
+                    </div>
+
+                    <div class="border-t border-stone-200 pt-6">
+                        <h3 class="text-xl font-bold text-stone-800">2. Recursos Adicionais</h3>
+                        <div class="space-y-4 mt-4">
+                            <div class="bg-stone-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-stone-700">Banco de Dados</span>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="database" id="database" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="database" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="databaseLevel" class="block text-xs text-stone-600">Nível: <span id="databaseLevelValue" class="font-bold text-teal-700">1</span></label>
+                                    <input id="databaseLevel" type="range" min="0" max="5" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                                    <div class="text-xs text-stone-500 mt-1">0 = Nenhum, 1 = Simples, 5 = Complexo</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-stone-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-stone-700">SEO Otimizado</span>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="seo" id="seo" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="seo" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="seoLevel" class="block text-xs text-stone-600">Nível: <span id="seoLevelValue" class="font-bold text-teal-700">1</span></label>
+                                    <input id="seoLevel" type="range" min="0" max="5" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                                    <div class="text-xs text-stone-500 mt-1">0 = Básico, 5 = SEO Avançado</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-stone-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-stone-700">Integrações (APIs)</span>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="integrations" id="integrations" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="integrations" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="integrationsLevel" class="block text-xs text-stone-600">Quantidade: <span id="integrationsLevelValue" class="font-bold text-teal-700">1</span></label>
+                                    <input id="integrationsLevel" type="range" min="0" max="10" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                                    <div class="text-xs text-stone-500 mt-1">Número de integrações/APIs</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-stone-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-stone-700">Copywriting</span>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="copywriting" id="copywriting" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="copywriting" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="copywritingLevel" class="block text-xs text-stone-600">Extensão: <span id="copywritingLevelValue" class="font-bold text-teal-700">1</span></label>
+                                    <input id="copywritingLevel" type="range" min="0" max="5" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                                    <div class="text-xs text-stone-500 mt-1">0 = Mínimo, 5 = Extenso</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-stone-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-stone-700">Design Exclusivo</span>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="design" id="design" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="design" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="designLevel" class="block text-xs text-stone-600">Complexidade: <span id="designLevelValue" class="font-bold text-teal-700">1</span></label>
+                                    <input id="designLevel" type="range" min="0" max="5" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                                    <div class="text-xs text-stone-500 mt-1">0 = Template, 5 = Design Premium</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-stone-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-stone-700">Urgência</span>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="urgency" id="urgency" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="urgency" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="urgencyLevel" class="block text-xs text-stone-600">Nível: <span id="urgencyLevelValue" class="font-bold text-teal-700">1</span></label>
+                                    <input id="urgencyLevel" type="range" min="0" max="3" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                                    <div class="text-xs text-stone-500 mt-1">0 = Normal, 3 = Extrema urgência</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-stone-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-stone-700">Manutenção Mensal</span>
+                                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="maintenance" id="maintenance" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                        <label for="maintenance" class="toggle-label block overflow-hidden h-6 rounded-full bg-stone-300 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="maintenanceLevel" class="block text-xs text-stone-600">Plano: <span id="maintenanceLevelValue" class="font-bold text-teal-700">1</span></label>
+                                    <input id="maintenanceLevel" type="range" min="0" max="3" value="1" class="w-full h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                                    <div class="text-xs text-stone-500 mt-1">0 = Básico, 3 = Premium</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Coluna de Resultados -->
+            <div id="results" class="sticky top-8 self-start">
+                <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
+                    <div class="mb-6 text-center">
+                        <h2 class="text-2xl font-bold text-stone-800">Estimativa de Custo</h2>
+                        <p class="text-stone-500 mt-1">O valor e a distribuição dos custos são atualizados instantaneamente com base nas suas seleções.</p>
+                    </div>
+                    <div class="text-center bg-teal-600 text-white py-6 px-4 rounded-xl">
+                        <p id="totalValue" class="text-4xl md:text-5xl font-bold">R$ 0,00</p>
+                        <p id="maintenanceValue" class="text-lg mt-1">+ R$ 0,00 / mês</p>
+                    </div>
+                    <div class="mt-8">
+                        <h3 class="text-xl font-bold text-center text-stone-800 mb-4">Distribuição de Custos</h3>
+                        <div class="chart-container">
+                            <canvas id="costChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Valores padrão
+            const defaultPrices = {
+                projectType: { none: 0, page: 3500, app: 5000 },
+                backend: 2500,
+                database: 800,
+                security: { Profissional: 1500, Simples: 750 },
+                perPage: 800,
+                complexity: 1200,
+                seo: 1200,
+                integrations: 1000,
+                copywriting: 1500, 
+                design: 2000,
+                urgency: 700,
+                maintenance: 750
+            };
+
+            // Carregar preços salvos ou usar os padrões
+            const savedPrices = localStorage.getItem('calculatorPrices');
+            const prices = savedPrices ? JSON.parse(savedPrices) : defaultPrices;
+
+            const form = document.getElementById('projectForm');
+            const totalValueEl = document.getElementById('totalValue');
+            const maintenanceValueEl = document.getElementById('maintenanceValue');
+            
+            const projectTypeEl = document.getElementById('projectType');
+            const pageTypeWrapper = document.getElementById('pageTypeWrapper');
+            const pageTypeEl = document.getElementById('pageType');
+            
+            const includeSecurityEl = document.getElementById('includeSecurity');
+            const securityLevelEl = document.getElementById('securityLevel');
+            const securityLevelValueEl = document.getElementById('securityLevelValue');
+
+            const backendEl = document.getElementById('backend');
+            const pagesEl = document.getElementById('pages');
+            const complexityEl = document.getElementById('complexity');
+            
+            const backendValueEl = document.getElementById('backendValue');
+            const pagesValueEl = document.getElementById('pagesValue');
+            const complexityValueEl = document.getElementById('complexityValue');
+
+            const databaseEl = document.getElementById('database');
+            const databaseLevelEl = document.getElementById('databaseLevel');
+            const databaseLevelValueEl = document.getElementById('databaseLevelValue');
+            
+            const seoEl = document.getElementById('seo');
+            const seoLevelEl = document.getElementById('seoLevel');
+            const seoLevelValueEl = document.getElementById('seoLevelValue');
+            
+            const integrationsEl = document.getElementById('integrations');
+            const integrationsLevelEl = document.getElementById('integrationsLevel');
+            const integrationsLevelValueEl = document.getElementById('integrationsLevelValue');
+            
+            const copywritingEl = document.getElementById('copywriting');
+            const copywritingLevelEl = document.getElementById('copywritingLevel');
+            const copywritingLevelValueEl = document.getElementById('copywritingLevelValue');
+            
+            const designEl = document.getElementById('design');
+            const designLevelEl = document.getElementById('designLevel');
+            const designLevelValueEl = document.getElementById('designLevelValue');
+            
+            const urgencyEl = document.getElementById('urgency');
+            const urgencyLevelEl = document.getElementById('urgencyLevel');
+            const urgencyLevelValueEl = document.getElementById('urgencyLevelValue');
+            
+            const maintenanceEl = document.getElementById('maintenance');
+            const maintenanceLevelEl = document.getElementById('maintenanceLevel');
+            const maintenanceLevelValueEl = document.getElementById('maintenanceLevelValue');
+
+            const ctx = document.getElementById('costChart').getContext('2d');
+            let costChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#14532d', '#0f766e', '#0e7490', '#1d4ed8', 
+                            '#6d28d9', '#a21caf', '#be185d'
+                        ],
+                        borderColor: '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            function formatCurrency(value) {
+                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+            }
+
+            function calculateAndRender() {
+                const projectType = projectTypeEl.value;
+                const pageType = pageTypeEl.value;
+                const backend = parseInt(backendEl.value);
+                const pages = parseInt(pagesEl.value);
+                const complexity = parseInt(complexityEl.value);
+                
+                const includeSecurity = includeSecurityEl.checked;
+                const securityLevel = parseInt(securityLevelEl.value);
+                
+                const hasDatabase = databaseEl.checked;
+                const databaseLevel = parseInt(databaseLevelEl.value);
+                
+                const hasSeo = seoEl.checked;
+                const seoLevel = parseInt(seoLevelEl.value);
+                
+                const hasIntegrations = integrationsEl.checked;
+                const integrationsLevel = parseInt(integrationsLevelEl.value);
+                
+                const hasCopywriting = copywritingEl.checked;
+                const copywritingLevel = parseInt(copywritingLevelEl.value);
+                
+                const hasDesign = designEl.checked;
+                const designLevel = parseInt(designLevelEl.value);
+                
+                const hasUrgency = urgencyEl.checked;
+                const urgencyLevel = parseInt(urgencyLevelEl.value);
+                
+                const hasMaintenance = maintenanceEl.checked;
+                const maintenanceLevel = parseInt(maintenanceLevelEl.value);
+
+                // Custo base só é aplicado se não for "none"
+                let baseCost = projectType !== 'none' ? prices.projectType[projectType] : 0;
+                let backendCost = backend * prices.backend;
+                let pagesCost = pages > 0 ? pages * prices.perPage : 0;
+                let complexityCost = complexity * prices.complexity;
+                
+                // Segurança só é aplicada se estiver habilitada
+                let securityCost = 0;
+                if (includeSecurity && securityLevel > 0) {
+                    if (projectType === 'page') {
+                        securityCost = securityLevel * prices.security[pageType];
+                    } else if (projectType === 'app') {
+                        securityCost = securityLevel * prices.security['Profissional'];
+                    } else {
+                        // Para projectType "none", usar preço simples
+                        securityCost = securityLevel * prices.security['Simples'];
+                    }
+                }
+
+                let databaseCost = hasDatabase ? databaseLevel * prices.database : 0;
+                let seoCost = hasSeo ? seoLevel * prices.seo : 0;
+                let integrationsCost = hasIntegrations ? integrationsLevel * prices.integrations : 0;
+                let urgencyCost = hasUrgency ? urgencyLevel * prices.urgency : 0;
+                let copywritingCost = hasCopywriting ? copywritingLevel * prices.copywriting : 0;
+                let designCost = hasDesign ? designLevel * prices.design : 0;
+                
+                let total = baseCost + backendCost + pagesCost + complexityCost + securityCost + 
+                           databaseCost + seoCost + integrationsCost + urgencyCost + copywritingCost + designCost;
+                let maintenanceCost = hasMaintenance ? maintenanceLevel * prices.maintenance : 0;
+
+                totalValueEl.textContent = formatCurrency(total);
+                maintenanceValueEl.textContent = `+ ${formatCurrency(maintenanceCost)} / mês`;
+                maintenanceValueEl.style.display = hasMaintenance ? 'block' : 'none';
+
+                // Atualizar displays dos valores
+                backendValueEl.textContent = backend;
+                pagesValueEl.textContent = pages;
+                complexityValueEl.textContent = complexity;
+                securityLevelValueEl.textContent = securityLevel;
+                databaseLevelValueEl.textContent = databaseLevel;
+                seoLevelValueEl.textContent = seoLevel;
+                integrationsLevelValueEl.textContent = integrationsLevel;
+                copywritingLevelValueEl.textContent = copywritingLevel;
+                designLevelValueEl.textContent = designLevel;
+                urgencyLevelValueEl.textContent = urgencyLevel;
+                maintenanceLevelValueEl.textContent = maintenanceLevel;
+
+                // Mostrar/ocultar opções de página baseado no tipo de projeto
+                pageTypeWrapper.style.display = projectType === 'page' ? 'block' : 'none';
+
+                updateChart({
+                    'Custo Base': baseCost,
+                    'Back-end': backendCost,
+                    'Páginas': pagesCost,
+                    'Complexidade': complexityCost,
+                    'Segurança': securityCost,
+                    'Banco de Dados': databaseCost,
+                    'SEO': seoCost,
+                    'Integrações': integrationsCost,
+                    'Copywriting': copywritingCost,
+                    'Design': designCost,
+                    'Urgência': urgencyCost,
+                });
+            }
+
+            function updateChart(costBreakdown) {
+                const labels = [];
+                const data = [];
+                for (const [key, value] of Object.entries(costBreakdown)) {
+                    if (value > 0) {
+                        labels.push(key);
+                        data.push(value);
+                    }
+                }
+                costChart.data.labels = labels;
+                costChart.data.datasets[0].data = data;
+                costChart.update();
+            }
+
+            form.addEventListener('input', calculateAndRender);
+            projectTypeEl.addEventListener('change', calculateAndRender);
+            pageTypeEl.addEventListener('change', calculateAndRender);
+
+            calculateAndRender();
+        });
+    </script>
+
+</body>
+</html>
