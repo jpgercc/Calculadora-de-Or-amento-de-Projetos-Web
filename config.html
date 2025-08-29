@@ -163,136 +163,356 @@
     </div>
 
     <script>
-        // Valores padrão
-        const defaultPrices = {
-            projectType: { none: 0, page: 3500, app: 5000 },
-            backend: 2500,
-            database: 800,
-            security: { Profissional: 1500, Simples: 750 },
-            perPage: 800,
-            complexity: 1200,
-            seo: 1200,
-            integrations: 1000,
-            copywriting: 1500, 
-            design: 2000,
-            urgency: 700,
-            maintenance: 750
-        };
+        // Classe para gerenciar configurações de preços
+        class PriceManager {
+            constructor() {
+                this.defaultPrices = {
+                    projectType: { none: 0, page: 3500, app: 5000 },
+                    backend: 2500,
+                    database: 800,
+                    security: { Profissional: 1500, Simples: 750 },
+                    perPage: 800,
+                    complexity: 1200,
+                    seo: 1200,
+                    integrations: 1000,
+                    copywriting: 1500, 
+                    design: 2000,
+                    urgency: 700,
+                    maintenance: 750
+                };
+                
+                this.storageKey = 'calculatorPrices';
+                this.lastSavedHash = null;
+            }
 
-        // Elementos do DOM
-        const elements = {
-            nonePrice: document.getElementById('nonePrice'),
-            pagePrice: document.getElementById('pagePrice'),
-            appPrice: document.getElementById('appPrice'),
-            backendPrice: document.getElementById('backendPrice'),
-            perPagePrice: document.getElementById('perPagePrice'),
-            complexityPrice: document.getElementById('complexityPrice'),
-            securitySimplePrice: document.getElementById('securitySimplePrice'),
-            securityProfessionalPrice: document.getElementById('securityProfessionalPrice'),
-            databasePrice: document.getElementById('databasePrice'),
-            seoPrice: document.getElementById('seoPrice'),
-            integrationsPrice: document.getElementById('integrationsPrice'),
-            copywritingPrice: document.getElementById('copywritingPrice'),
-            designPrice: document.getElementById('designPrice'),
-            urgencyPrice: document.getElementById('urgencyPrice'),
-            maintenancePrice: document.getElementById('maintenancePrice'),
-            saveBtn: document.getElementById('saveBtn'),
-            resetBtn: document.getElementById('resetBtn'),
-            exportBtn: document.getElementById('exportBtn'),
-            importBtn: document.getElementById('importBtn'),
-            importInput: document.getElementById('importInput'),
-            saveIndicator: document.getElementById('saveIndicator')
-        };
+            // Validar estrutura de preços
+            validatePrices(prices) {
+                const requiredKeys = ['projectType', 'backend', 'database', 'security', 'perPage', 
+                                    'complexity', 'seo', 'integrations', 'copywriting', 'design', 'urgency', 'maintenance'];
+                
+                for (const key of requiredKeys) {
+                    if (!(key in prices)) {
+                        throw new Error(`Campo obrigatório ausente: ${key}`);
+                    }
+                }
+
+                // Validar tipos específicos
+                if (!prices.projectType || typeof prices.projectType !== 'object') {
+                    throw new Error('projectType deve ser um objeto');
+                }
+
+                if (!prices.security || typeof prices.security !== 'object') {
+                    throw new Error('security deve ser um objeto');
+                }
+
+                // Validar valores numéricos
+                const numericFields = ['backend', 'database', 'perPage', 'complexity', 'seo', 
+                                     'integrations', 'copywriting', 'design', 'urgency', 'maintenance'];
+                
+                for (const field of numericFields) {
+                    if (typeof prices[field] !== 'number' || prices[field] < 0) {
+                        throw new Error(`${field} deve ser um número não negativo`);
+                    }
+                }
+
+                return true;
+            }
+
+            // Obter preços com fallback
+            getPrices() {
+                try {
+                    const savedPrices = localStorage.getItem(this.storageKey);
+                    if (savedPrices) {
+                        const parsed = JSON.parse(savedPrices);
+                        this.validatePrices(parsed);
+                        return { ...this.defaultPrices, ...parsed };
+                    }
+                } catch (error) {
+                    console.warn('Erro ao carregar preços salvos, usando padrões:', error);
+                    localStorage.removeItem(this.storageKey);
+                }
+                return this.defaultPrices;
+            }
+
+            // Salvar preços com validação
+            savePrices(prices) {
+                try {
+                    this.validatePrices(prices);
+                    const pricesJson = JSON.stringify(prices);
+                    localStorage.setItem(this.storageKey, pricesJson);
+                    this.lastSavedHash = this.hashCode(pricesJson);
+                    return true;
+                } catch (error) {
+                    throw new Error(`Erro ao salvar configurações: ${error.message}`);
+                }
+            }
+
+            // Verificar se há mudanças não salvas
+            hasUnsavedChanges(currentPrices) {
+                const currentHash = this.hashCode(JSON.stringify(currentPrices));
+                return this.lastSavedHash !== null && this.lastSavedHash !== currentHash;
+            }
+
+            // Hash simples para detectar mudanças
+            hashCode(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; // Convert to 32bit integer
+                }
+                return hash;
+            }
+
+            // Resetar para valores padrão
+            resetToDefaults() {
+                localStorage.removeItem(this.storageKey);
+                this.lastSavedHash = null;
+                return this.defaultPrices;
+            }
+        }
+
+        // Instância global do gerenciador de preços
+        const priceManager = new PriceManager();
+
+        // Classe para gerenciar a interface
+        class ConfigUI {
+            constructor() {
+                this.elements = {
+                    nonePrice: document.getElementById('nonePrice'),
+                    pagePrice: document.getElementById('pagePrice'),
+                    appPrice: document.getElementById('appPrice'),
+                    backendPrice: document.getElementById('backendPrice'),
+                    perPagePrice: document.getElementById('perPagePrice'),
+                    complexityPrice: document.getElementById('complexityPrice'),
+                    securitySimplePrice: document.getElementById('securitySimplePrice'),
+                    securityProfessionalPrice: document.getElementById('securityProfessionalPrice'),
+                    databasePrice: document.getElementById('databasePrice'),
+                    seoPrice: document.getElementById('seoPrice'),
+                    integrationsPrice: document.getElementById('integrationsPrice'),
+                    copywritingPrice: document.getElementById('copywritingPrice'),
+                    designPrice: document.getElementById('designPrice'),
+                    urgencyPrice: document.getElementById('urgencyPrice'),
+                    maintenancePrice: document.getElementById('maintenancePrice'),
+                    saveBtn: document.getElementById('saveBtn'),
+                    resetBtn: document.getElementById('resetBtn'),
+                    exportBtn: document.getElementById('exportBtn'),
+                    importBtn: document.getElementById('importBtn'),
+                    importInput: document.getElementById('importInput'),
+                    saveIndicator: document.getElementById('saveIndicator')
+                };
+
+                this.debounceTimer = null;
+                this.autoSaveEnabled = true;
+            }
+
+            // Carregar valores na interface
+            loadPrices(prices) {
+                try {
+                    this.elements.nonePrice.value = prices.projectType.none || 0;
+                    this.elements.pagePrice.value = prices.projectType.page;
+                    this.elements.appPrice.value = prices.projectType.app;
+                    this.elements.backendPrice.value = prices.backend;
+                    this.elements.perPagePrice.value = prices.perPage;
+                    this.elements.complexityPrice.value = prices.complexity;
+                    this.elements.securitySimplePrice.value = prices.security.Simples;
+                    this.elements.securityProfessionalPrice.value = prices.security.Profissional;
+                    this.elements.databasePrice.value = prices.database;
+                    this.elements.seoPrice.value = prices.seo;
+                    this.elements.integrationsPrice.value = prices.integrations;
+                    this.elements.copywritingPrice.value = prices.copywriting;
+                    this.elements.designPrice.value = prices.design;
+                    this.elements.urgencyPrice.value = prices.urgency;
+                    this.elements.maintenancePrice.value = prices.maintenance;
+
+                    // Marcar como salvos
+                    priceManager.lastSavedHash = priceManager.hashCode(JSON.stringify(prices));
+                } catch (error) {
+                    this.showError('Erro ao carregar configurações: ' + error.message);
+                }
+            }
+
+            // Coletar valores da interface
+            collectPrices() {
+                const getValue = (element) => {
+                    const value = parseInt(element.value) || 0;
+                    return Math.max(0, value); // Garantir valores não negativos
+                };
+
+                return {
+                    projectType: { 
+                        none: getValue(this.elements.nonePrice),
+                        page: getValue(this.elements.pagePrice), 
+                        app: getValue(this.elements.appPrice)
+                    },
+                    backend: getValue(this.elements.backendPrice),
+                    database: getValue(this.elements.databasePrice),
+                    security: { 
+                        Profissional: getValue(this.elements.securityProfessionalPrice), 
+                        Simples: getValue(this.elements.securitySimplePrice)
+                    },
+                    perPage: getValue(this.elements.perPagePrice),
+                    complexity: getValue(this.elements.complexityPrice),
+                    seo: getValue(this.elements.seoPrice),
+                    integrations: getValue(this.elements.integrationsPrice),
+                    copywriting: getValue(this.elements.copywritingPrice),
+                    design: getValue(this.elements.designPrice),
+                    urgency: getValue(this.elements.urgencyPrice),
+                    maintenance: getValue(this.elements.maintenancePrice)
+                };
+            }
+
+            // Salvar com debounce para auto-save
+            debouncedSave() {
+                if (!this.autoSaveEnabled) return;
+
+                clearTimeout(this.debounceTimer);
+                this.debounceTimer = setTimeout(() => {
+                    this.savePrices();
+                }, 1000); // 1 segundo de delay
+            }
+
+            // Salvar configurações
+            savePrices() {
+                try {
+                    const prices = this.collectPrices();
+                    priceManager.savePrices(prices);
+                    this.showSaveIndicator('Configurações salvas!', 'success');
+                } catch (error) {
+                    this.showError('Erro ao salvar: ' + error.message);
+                }
+            }
+
+            // Mostrar indicador de salvamento
+            showSaveIndicator(message = 'Configurações salvas!', type = 'success') {
+                const indicator = this.elements.saveIndicator;
+                indicator.textContent = message;
+                
+                // Alterar cor baseado no tipo
+                indicator.className = `save-indicator show fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${
+                    type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                }`;
+                
+                setTimeout(() => {
+                    indicator.classList.remove('show');
+                    indicator.classList.add('hide');
+                }, 2500);
+            }
+
+            // Mostrar erro
+            showError(message) {
+                this.showSaveIndicator(message, 'error');
+                console.error(message);
+            }
+
+            // Configurar auto-save
+            setupAutoSave() {
+                Object.values(this.elements).forEach(element => {
+                    if (element.type === 'number') {
+                        element.addEventListener('input', () => this.debouncedSave());
+                        element.addEventListener('blur', () => this.validateInput(element));
+                    }
+                });
+            }
+
+            // Validar entrada individual
+            validateInput(element) {
+                const value = parseInt(element.value);
+                if (isNaN(value) || value < 0) {
+                    element.value = 0;
+                    this.showError(`Valor inválido em ${element.previousElementSibling.textContent}. Usando 0.`);
+                }
+            }
+        }
+
+        // Instância global da interface
+        const configUI = new ConfigUI();
+
+        // Funções utilitárias
+        class ConfigUtils {
+            static formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            static generateBackup() {
+                const prices = configUI.collectPrices();
+                const backup = {
+                    version: '1.0',
+                    timestamp: new Date().toISOString(),
+                    data: prices,
+                    checksum: priceManager.hashCode(JSON.stringify(prices))
+                };
+                return backup;
+            }
+
+            static validateBackup(backup) {
+                if (!backup || typeof backup !== 'object') {
+                    throw new Error('Formato de backup inválido');
+                }
+
+                if (!backup.data || !backup.version) {
+                    throw new Error('Backup incompleto ou corrompido');
+                }
+
+                // Verificar checksum se disponível
+                if (backup.checksum) {
+                    const currentChecksum = priceManager.hashCode(JSON.stringify(backup.data));
+                    if (currentChecksum !== backup.checksum) {
+                        throw new Error('Backup corrompido (checksum inválido)');
+                    }
+                }
+
+                priceManager.validatePrices(backup.data);
+                return true;
+            }
+        }
 
         // Carregar valores salvos ou padrões
         function loadPrices() {
-            const savedPrices = localStorage.getItem('calculatorPrices');
-            const prices = savedPrices ? JSON.parse(savedPrices) : defaultPrices;
-
-            elements.nonePrice.value = prices.projectType.none || 0;
-            elements.pagePrice.value = prices.projectType.page;
-            elements.appPrice.value = prices.projectType.app;
-            elements.backendPrice.value = prices.backend;
-            elements.perPagePrice.value = prices.perPage;
-            elements.complexityPrice.value = prices.complexity;
-            elements.securitySimplePrice.value = prices.security.Simples;
-            elements.securityProfessionalPrice.value = prices.security.Profissional;
-            elements.databasePrice.value = prices.database;
-            elements.seoPrice.value = prices.seo;
-            elements.integrationsPrice.value = prices.integrations;
-            elements.copywritingPrice.value = prices.copywriting;
-            elements.designPrice.value = prices.design;
-            elements.urgencyPrice.value = prices.urgency;
-            elements.maintenancePrice.value = prices.maintenance;
-        }
-
-        // Coletar valores dos inputs
-        function collectPrices() {
-            return {
-                projectType: { 
-                    none: parseInt(elements.nonePrice.value) || 0,
-                    page: parseInt(elements.pagePrice.value) || 0, 
-                    app: parseInt(elements.appPrice.value) || 0 
-                },
-                backend: parseInt(elements.backendPrice.value) || 0,
-                database: parseInt(elements.databasePrice.value) || 0,
-                security: { 
-                    Profissional: parseInt(elements.securityProfessionalPrice.value) || 0, 
-                    Simples: parseInt(elements.securitySimplePrice.value) || 0 
-                },
-                perPage: parseInt(elements.perPagePrice.value) || 0,
-                complexity: parseInt(elements.complexityPrice.value) || 0,
-                seo: parseInt(elements.seoPrice.value) || 0,
-                integrations: parseInt(elements.integrationsPrice.value) || 0,
-                copywriting: parseInt(elements.copywritingPrice.value) || 0,
-                design: parseInt(elements.designPrice.value) || 0,
-                urgency: parseInt(elements.urgencyPrice.value) || 0,
-                maintenance: parseInt(elements.maintenancePrice.value) || 0
-            };
-        }
-
-        // Salvar configurações
-        function savePrices() {
-            const prices = collectPrices();
-            localStorage.setItem('calculatorPrices', JSON.stringify(prices));
-            showSaveIndicator();
-        }
-
-        // Mostrar indicador de salvamento
-        function showSaveIndicator() {
-            elements.saveIndicator.classList.remove('hide');
-            elements.saveIndicator.classList.add('show');
-            
-            setTimeout(() => {
-                elements.saveIndicator.classList.remove('show');
-                elements.saveIndicator.classList.add('hide');
-            }, 2000);
+            const prices = priceManager.getPrices();
+            configUI.loadPrices(prices);
         }
 
         // Restaurar valores padrão
         function resetToDefaults() {
             if (confirm('Tem certeza de que deseja restaurar todos os valores para os padrões? Esta ação não pode ser desfeita.')) {
-                localStorage.removeItem('calculatorPrices');
-                loadPrices();
-                showSaveIndicator();
+                try {
+                    const defaultPrices = priceManager.resetToDefaults();
+                    configUI.loadPrices(defaultPrices);
+                    configUI.showSaveIndicator('Configurações restauradas para os padrões!');
+                } catch (error) {
+                    configUI.showError('Erro ao restaurar padrões: ' + error.message);
+                }
             }
         }
 
         // Exportar configurações
         function exportConfig() {
-            const prices = collectPrices();
-            const dataStr = JSON.stringify(prices, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(dataBlob);
-            link.download = 'configuracoes-precos.json';
-            link.click();
+            try {
+                const backup = ConfigUtils.generateBackup();
+                const dataStr = JSON.stringify(backup, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(dataBlob);
+                
+                const timestamp = new Date().toISOString().split('T')[0];
+                link.download = `configuracoes-precos-${timestamp}.json`;
+                link.click();
+                
+                configUI.showSaveIndicator(`Configurações exportadas (${ConfigUtils.formatFileSize(dataBlob.size)})`);
+            } catch (error) {
+                configUI.showError('Erro ao exportar: ' + error.message);
+            }
         }
 
         // Importar configurações
         function importConfig() {
-            elements.importInput.click();
+            configUI.elements.importInput.click();
         }
 
         // Processar arquivo importado
@@ -300,49 +520,73 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            if (file.size > 1024 * 1024) { // 1MB limit
+                configUI.showError('Arquivo muito grande. Limite: 1MB');
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const importedPrices = JSON.parse(e.target.result);
+                    const imported = JSON.parse(e.target.result);
                     
-                    // Validar estrutura do arquivo
-                    if (importedPrices.projectType && importedPrices.backend !== undefined) {
-                        localStorage.setItem('calculatorPrices', JSON.stringify(importedPrices));
-                        loadPrices();
-                        showSaveIndicator();
+                    // Verificar se é um backup completo ou apenas dados
+                    let importedPrices;
+                    if (imported.data && imported.version) {
+                        // Formato de backup completo
+                        ConfigUtils.validateBackup(imported);
+                        importedPrices = imported.data;
                     } else {
-                        alert('Arquivo de configuração inválido. Verifique a estrutura do arquivo.');
+                        // Formato legado ou dados diretos
+                        priceManager.validatePrices(imported);
+                        importedPrices = imported;
                     }
+                    
+                    priceManager.savePrices(importedPrices);
+                    configUI.loadPrices(importedPrices);
+                    configUI.showSaveIndicator('Configurações importadas com sucesso!');
+                    
                 } catch (error) {
-                    alert('Erro ao ler o arquivo. Verifique se é um arquivo JSON válido.');
+                    configUI.showError('Erro ao importar: ' + error.message);
                 }
             };
+            
+            reader.onerror = function() {
+                configUI.showError('Erro ao ler o arquivo');
+            };
+            
             reader.readAsText(file);
             
             // Limpar o input para permitir selecionar o mesmo arquivo novamente
             event.target.value = '';
         }
 
-        // Auto-save quando houver mudanças
-        function setupAutoSave() {
-            Object.values(elements).forEach(element => {
-                if (element.type === 'number') {
-                    element.addEventListener('input', savePrices);
+        // Detectar mudanças não salvas antes de sair
+        function setupBeforeUnload() {
+            window.addEventListener('beforeunload', (e) => {
+                const currentPrices = configUI.collectPrices();
+                if (priceManager.hasUnsavedChanges(currentPrices)) {
+                    e.preventDefault();
+                    e.returnValue = 'Você tem alterações não salvas. Deseja sair mesmo assim?';
                 }
             });
         }
 
         // Event listeners
-        elements.saveBtn.addEventListener('click', savePrices);
-        elements.resetBtn.addEventListener('click', resetToDefaults);
-        elements.exportBtn.addEventListener('click', exportConfig);
-        elements.importBtn.addEventListener('click', importConfig);
-        elements.importInput.addEventListener('change', handleFileImport);
+        configUI.elements.saveBtn.addEventListener('click', () => configUI.savePrices());
+        configUI.elements.resetBtn.addEventListener('click', resetToDefaults);
+        configUI.elements.exportBtn.addEventListener('click', exportConfig);
+        configUI.elements.importBtn.addEventListener('click', importConfig);
+        configUI.elements.importInput.addEventListener('change', handleFileImport);
 
-        // Inicializar
+        // Inicializar aplicação
         document.addEventListener('DOMContentLoaded', () => {
             loadPrices();
-            setupAutoSave();
+            configUI.setupAutoSave();
+            setupBeforeUnload();
+            
+            // Indicar que a aplicação está pronta
+            configUI.showSaveIndicator('Configurações carregadas!');
         });
     </script>
 
