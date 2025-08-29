@@ -40,6 +40,71 @@
         .toggle-checkbox:checked + .toggle-label {
             background-color: #0d9488;
         }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #374151;
+            color: white;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        .info-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background-color: #6b7280;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 12px;
+            line-height: 16px;
+            margin-left: 4px;
+            cursor: help;
+        }
+        .loading-indicator {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-size: 14px;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        /* Otimizações de performance */
+        canvas {
+            will-change: transform;
+        }
+        .chart-container {
+            contain: layout style paint;
+        }
     </style>
 </head>
 <body class="bg-stone-50 text-stone-800">
@@ -57,6 +122,11 @@
 
         <main class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             
+            <!-- Indicador de carregamento -->
+            <div id="loadingIndicator" class="loading-indicator">
+                <span class="pulse">⚡ Calculando...</span>
+            </div>
+            
             <!-- Coluna de Configuração -->
             <div id="configurator" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-stone-200">
                 <div class="mb-6">
@@ -67,7 +137,13 @@
                 <form id="projectForm" class="space-y-6">
                     
                     <div>
-                        <label for="projectType" class="block text-sm font-medium text-stone-700 mb-1">Tipo de Projeto</label>
+                        <label for="projectType" class="block text-sm font-medium text-stone-700 mb-1">
+                            Tipo de Projeto
+                            <span class="tooltip">
+                                <span class="info-icon">?</span>
+                                <span class="tooltiptext">Escolha "Nenhum" para projetos personalizados sem custo base, "Página Web" para sites simples, ou "Aplicação Web" para sistemas complexos.</span>
+                            </span>
+                        </label>
                         <select id="projectType" class="w-full p-3 bg-stone-100 border border-stone-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
                             <option value="none">Nenhum (Custo Base Zero)</option>
                             <option value="page">Página Web</option>
@@ -245,247 +321,506 @@
                             <canvas id="costChart"></canvas>
                         </div>
                     </div>
+                    <div class="mt-6 text-center">
+                        <button id="exportBudgetBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                            📄 Exportar Orçamento
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Valores padrão
-            const defaultPrices = {
-                projectType: { none: 0, page: 3500, app: 5000 },
-                backend: 2500,
-                database: 800,
-                security: { Profissional: 1500, Simples: 750 },
-                perPage: 800,
-                complexity: 1200,
-                seo: 1200,
-                integrations: 1000,
-                copywriting: 1500, 
-                design: 2000,
-                urgency: 700,
-                maintenance: 750
-            };
+        // Classe para gerenciar a calculadora de orçamento
+        class BudgetCalculator {
+            constructor() {
+                this.prices = this.loadPrices();
+                this.cache = new Map();
+                this.lastCalculation = null;
+            }
 
-            // Carregar preços salvos ou usar os padrões
-            const savedPrices = localStorage.getItem('calculatorPrices');
-            const prices = savedPrices ? JSON.parse(savedPrices) : defaultPrices;
+            // Carregar preços com fallback
+            loadPrices() {
+                const defaultPrices = {
+                    projectType: { none: 0, page: 3500, app: 5000 },
+                    backend: 2500,
+                    database: 800,
+                    security: { Profissional: 1500, Simples: 750 },
+                    perPage: 800,
+                    complexity: 1200,
+                    seo: 1200,
+                    integrations: 1000,
+                    copywriting: 1500, 
+                    design: 2000,
+                    urgency: 700,
+                    maintenance: 750
+                };
 
-            const form = document.getElementById('projectForm');
-            const totalValueEl = document.getElementById('totalValue');
-            const maintenanceValueEl = document.getElementById('maintenanceValue');
-            
-            const projectTypeEl = document.getElementById('projectType');
-            const pageTypeWrapper = document.getElementById('pageTypeWrapper');
-            const pageTypeEl = document.getElementById('pageType');
-            
-            const includeSecurityEl = document.getElementById('includeSecurity');
-            const securityLevelEl = document.getElementById('securityLevel');
-            const securityLevelValueEl = document.getElementById('securityLevelValue');
+                try {
+                    const savedPrices = localStorage.getItem('calculatorPrices');
+                    if (savedPrices) {
+                        const parsed = JSON.parse(savedPrices);
+                        return { ...defaultPrices, ...parsed };
+                    }
+                } catch (error) {
+                    console.warn('Erro ao carregar preços, usando padrões:', error);
+                }
+                return defaultPrices;
+            }
 
-            const backendEl = document.getElementById('backend');
-            const pagesEl = document.getElementById('pages');
-            const complexityEl = document.getElementById('complexity');
-            
-            const backendValueEl = document.getElementById('backendValue');
-            const pagesValueEl = document.getElementById('pagesValue');
-            const complexityValueEl = document.getElementById('complexityValue');
+            // Calcular custo de segurança com base no tipo de projeto
+            calculateSecurityCost(projectType, pageType, securityLevel, includeSecurity) {
+                if (!includeSecurity || securityLevel <= 0) return 0;
 
-            const databaseEl = document.getElementById('database');
-            const databaseLevelEl = document.getElementById('databaseLevel');
-            const databaseLevelValueEl = document.getElementById('databaseLevelValue');
-            
-            const seoEl = document.getElementById('seo');
-            const seoLevelEl = document.getElementById('seoLevel');
-            const seoLevelValueEl = document.getElementById('seoLevelValue');
-            
-            const integrationsEl = document.getElementById('integrations');
-            const integrationsLevelEl = document.getElementById('integrationsLevel');
-            const integrationsLevelValueEl = document.getElementById('integrationsLevelValue');
-            
-            const copywritingEl = document.getElementById('copywriting');
-            const copywritingLevelEl = document.getElementById('copywritingLevel');
-            const copywritingLevelValueEl = document.getElementById('copywritingLevelValue');
-            
-            const designEl = document.getElementById('design');
-            const designLevelEl = document.getElementById('designLevel');
-            const designLevelValueEl = document.getElementById('designLevelValue');
-            
-            const urgencyEl = document.getElementById('urgency');
-            const urgencyLevelEl = document.getElementById('urgencyLevel');
-            const urgencyLevelValueEl = document.getElementById('urgencyLevelValue');
-            
-            const maintenanceEl = document.getElementById('maintenance');
-            const maintenanceLevelEl = document.getElementById('maintenanceLevel');
-            const maintenanceLevelValueEl = document.getElementById('maintenanceLevelValue');
+                let securityType;
+                switch (projectType) {
+                    case 'page':
+                        securityType = pageType;
+                        break;
+                    case 'app':
+                        securityType = 'Profissional';
+                        break;
+                    default:
+                        securityType = 'Simples';
+                }
 
-            const ctx = document.getElementById('costChart').getContext('2d');
-            let costChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            '#14532d', '#0f766e', '#0e7490', '#1d4ed8', 
-                            '#6d28d9', '#a21caf', '#be185d'
-                        ],
-                        borderColor: '#ffffff',
-                        borderWidth: 2,
-                        hoverOffset: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                font: {
-                                    family: 'Inter',
-                                    size: 12
+                return securityLevel * (this.prices.security[securityType] || this.prices.security.Simples);
+            }
+
+            // Calcular custos com cache
+            calculate(projectData) {
+                const cacheKey = JSON.stringify(projectData);
+                if (this.cache.has(cacheKey)) {
+                    return this.cache.get(cacheKey);
+                }
+
+                const {
+                    projectType, pageType, backend, pages, complexity,
+                    includeSecurity, securityLevel,
+                    hasDatabase, databaseLevel,
+                    hasSeo, seoLevel,
+                    hasIntegrations, integrationsLevel,
+                    hasCopywriting, copywritingLevel,
+                    hasDesign, designLevel,
+                    hasUrgency, urgencyLevel,
+                    hasMaintenance, maintenanceLevel
+                } = projectData;
+
+                // Custo base só é aplicado se não for "none"
+                const baseCost = projectType !== 'none' ? this.prices.projectType[projectType] : 0;
+                
+                // Custos escaláveis
+                const backendCost = backend * this.prices.backend;
+                const pagesCost = pages > 0 ? pages * this.prices.perPage : 0;
+                const complexityCost = complexity * this.prices.complexity;
+                
+                // Segurança com lógica melhorada
+                const securityCost = this.calculateSecurityCost(projectType, pageType, securityLevel, includeSecurity);
+                
+                // Recursos opcionais
+                const databaseCost = hasDatabase ? databaseLevel * this.prices.database : 0;
+                const seoCost = hasSeo ? seoLevel * this.prices.seo : 0;
+                const integrationsCost = hasIntegrations ? integrationsLevel * this.prices.integrations : 0;
+                const urgencyCost = hasUrgency ? urgencyLevel * this.prices.urgency : 0;
+                const copywritingCost = hasCopywriting ? copywritingLevel * this.prices.copywriting : 0;
+                const designCost = hasDesign ? designLevel * this.prices.design : 0;
+                
+                const total = baseCost + backendCost + pagesCost + complexityCost + securityCost + 
+                             databaseCost + seoCost + integrationsCost + urgencyCost + copywritingCost + designCost;
+                
+                const maintenanceCost = hasMaintenance ? maintenanceLevel * this.prices.maintenance : 0;
+
+                const result = {
+                    total,
+                    maintenanceCost,
+                    breakdown: {
+                        'Custo Base': baseCost,
+                        'Back-end': backendCost,
+                        'Páginas': pagesCost,
+                        'Complexidade': complexityCost,
+                        'Segurança': securityCost,
+                        'Banco de Dados': databaseCost,
+                        'SEO': seoCost,
+                        'Integrações': integrationsCost,
+                        'Copywriting': copywritingCost,
+                        'Design': designCost,
+                        'Urgência': urgencyCost
+                    }
+                };
+
+                // Cache do resultado
+                this.cache.set(cacheKey, result);
+                this.lastCalculation = result;
+                
+                return result;
+            }
+
+            // Limpar cache quando preços são atualizados
+            clearCache() {
+                this.cache.clear();
+                this.prices = this.loadPrices();
+            }
+
+            // Obter resumo do projeto
+            getProjectSummary(projectData) {
+                const result = this.calculate(projectData);
+                const features = [];
+
+                if (projectData.projectType !== 'none') {
+                    features.push(`Tipo: ${this.getProjectTypeLabel(projectData.projectType)}`);
+                }
+                if (projectData.backend > 0) features.push(`Back-end (Nível ${projectData.backend})`);
+                if (projectData.pages > 0) features.push(`${projectData.pages} páginas extras`);
+                if (projectData.complexity > 0) features.push(`Complexidade (Nível ${projectData.complexity})`);
+                if (projectData.includeSecurity) features.push(`Segurança (Nível ${projectData.securityLevel})`);
+                if (projectData.hasDatabase) features.push(`Banco de Dados (Nível ${projectData.databaseLevel})`);
+                if (projectData.hasSeo) features.push(`SEO (Nível ${projectData.seoLevel})`);
+                if (projectData.hasIntegrations) features.push(`Integrações (Nível ${projectData.integrationsLevel})`);
+                if (projectData.hasCopywriting) features.push(`Copywriting (Nível ${projectData.copywritingLevel})`);
+                if (projectData.hasDesign) features.push(`Design (Nível ${projectData.designLevel})`);
+                if (projectData.hasUrgency) features.push(`Urgência (Nível ${projectData.urgencyLevel})`);
+
+                return {
+                    total: result.total,
+                    maintenance: result.maintenanceCost,
+                    features,
+                    breakdown: result.breakdown
+                };
+            }
+
+            getProjectTypeLabel(type) {
+                const labels = {
+                    'none': 'Personalizado',
+                    'page': 'Página Web',
+                    'app': 'Aplicação Web'
+                };
+                return labels[type] || type;
+            }
+        }
+
+        // Classe para gerenciar a interface da calculadora
+        class CalculatorUI {
+            constructor(calculator) {
+                this.calculator = calculator;
+                this.chart = null;
+                this.elements = this.initializeElements();
+                this.debounceTimer = null;
+            }
+
+            initializeElements() {
+                return {
+                    form: document.getElementById('projectForm'),
+                    totalValue: document.getElementById('totalValue'),
+                    maintenanceValue: document.getElementById('maintenanceValue'),
+                    
+                    projectType: document.getElementById('projectType'),
+                    pageTypeWrapper: document.getElementById('pageTypeWrapper'),
+                    pageType: document.getElementById('pageType'),
+                    
+                    includeSecurity: document.getElementById('includeSecurity'),
+                    securityLevel: document.getElementById('securityLevel'),
+                    securityLevelValue: document.getElementById('securityLevelValue'),
+
+                    backend: document.getElementById('backend'),
+                    pages: document.getElementById('pages'),
+                    complexity: document.getElementById('complexity'),
+                    
+                    backendValue: document.getElementById('backendValue'),
+                    pagesValue: document.getElementById('pagesValue'),
+                    complexityValue: document.getElementById('complexityValue'),
+
+                    database: document.getElementById('database'),
+                    databaseLevel: document.getElementById('databaseLevel'),
+                    databaseLevelValue: document.getElementById('databaseLevelValue'),
+                    
+                    seo: document.getElementById('seo'),
+                    seoLevel: document.getElementById('seoLevel'),
+                    seoLevelValue: document.getElementById('seoLevelValue'),
+                    
+                    integrations: document.getElementById('integrations'),
+                    integrationsLevel: document.getElementById('integrationsLevel'),
+                    integrationsLevelValue: document.getElementById('integrationsLevelValue'),
+                    
+                    copywriting: document.getElementById('copywriting'),
+                    copywritingLevel: document.getElementById('copywritingLevel'),
+                    copywritingLevelValue: document.getElementById('copywritingLevelValue'),
+                    
+                    design: document.getElementById('design'),
+                    designLevel: document.getElementById('designLevel'),
+                    designLevelValue: document.getElementById('designLevelValue'),
+                    
+                    urgency: document.getElementById('urgency'),
+                    urgencyLevel: document.getElementById('urgencyLevel'),
+                    urgencyLevelValue: document.getElementById('urgencyLevelValue'),
+                    
+                    maintenance: document.getElementById('maintenance'),
+                    maintenanceLevel: document.getElementById('maintenanceLevel'),
+                    maintenanceLevelValue: document.getElementById('maintenanceLevelValue')
+                };
+            }
+
+            initializeChart() {
+                const ctx = document.getElementById('costChart').getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            data: [],
+                            backgroundColor: [
+                                '#14532d', '#0f766e', '#0e7490', '#1d4ed8', 
+                                '#6d28d9', '#a21caf', '#be185d', '#ea580c', '#dc2626'
+                            ],
+                            borderColor: '#ffffff',
+                            borderWidth: 2,
+                            hoverOffset: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: {
+                                        family: 'Inter',
+                                        size: 12
+                                    },
+                                    usePointStyle: true,
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const label = context.label || '';
+                                        const value = this.formatCurrency(context.parsed);
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        return `${label}: ${value} (${percentage}%)`;
+                                    }
                                 }
                             }
                         },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed !== null) {
-                                        label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed);
-                                    }
-                                    return label;
-                                }
-                            }
+                        animation: {
+                            animateRotate: true,
+                            duration: 800
                         }
                     }
-                }
-            });
-
-            function formatCurrency(value) {
-                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-            }
-
-            function calculateAndRender() {
-                const projectType = projectTypeEl.value;
-                const pageType = pageTypeEl.value;
-                const backend = parseInt(backendEl.value);
-                const pages = parseInt(pagesEl.value);
-                const complexity = parseInt(complexityEl.value);
-                
-                const includeSecurity = includeSecurityEl.checked;
-                const securityLevel = parseInt(securityLevelEl.value);
-                
-                const hasDatabase = databaseEl.checked;
-                const databaseLevel = parseInt(databaseLevelEl.value);
-                
-                const hasSeo = seoEl.checked;
-                const seoLevel = parseInt(seoLevelEl.value);
-                
-                const hasIntegrations = integrationsEl.checked;
-                const integrationsLevel = parseInt(integrationsLevelEl.value);
-                
-                const hasCopywriting = copywritingEl.checked;
-                const copywritingLevel = parseInt(copywritingLevelEl.value);
-                
-                const hasDesign = designEl.checked;
-                const designLevel = parseInt(designLevelEl.value);
-                
-                const hasUrgency = urgencyEl.checked;
-                const urgencyLevel = parseInt(urgencyLevelEl.value);
-                
-                const hasMaintenance = maintenanceEl.checked;
-                const maintenanceLevel = parseInt(maintenanceLevelEl.value);
-
-                // Custo base só é aplicado se não for "none"
-                let baseCost = projectType !== 'none' ? prices.projectType[projectType] : 0;
-                let backendCost = backend * prices.backend;
-                let pagesCost = pages > 0 ? pages * prices.perPage : 0;
-                let complexityCost = complexity * prices.complexity;
-                
-                // Segurança só é aplicada se estiver habilitada
-                let securityCost = 0;
-                if (includeSecurity && securityLevel > 0) {
-                    if (projectType === 'page') {
-                        securityCost = securityLevel * prices.security[pageType];
-                    } else if (projectType === 'app') {
-                        securityCost = securityLevel * prices.security['Profissional'];
-                    } else {
-                        // Para projectType "none", usar preço simples
-                        securityCost = securityLevel * prices.security['Simples'];
-                    }
-                }
-
-                let databaseCost = hasDatabase ? databaseLevel * prices.database : 0;
-                let seoCost = hasSeo ? seoLevel * prices.seo : 0;
-                let integrationsCost = hasIntegrations ? integrationsLevel * prices.integrations : 0;
-                let urgencyCost = hasUrgency ? urgencyLevel * prices.urgency : 0;
-                let copywritingCost = hasCopywriting ? copywritingLevel * prices.copywriting : 0;
-                let designCost = hasDesign ? designLevel * prices.design : 0;
-                
-                let total = baseCost + backendCost + pagesCost + complexityCost + securityCost + 
-                           databaseCost + seoCost + integrationsCost + urgencyCost + copywritingCost + designCost;
-                let maintenanceCost = hasMaintenance ? maintenanceLevel * prices.maintenance : 0;
-
-                totalValueEl.textContent = formatCurrency(total);
-                maintenanceValueEl.textContent = `+ ${formatCurrency(maintenanceCost)} / mês`;
-                maintenanceValueEl.style.display = hasMaintenance ? 'block' : 'none';
-
-                // Atualizar displays dos valores
-                backendValueEl.textContent = backend;
-                pagesValueEl.textContent = pages;
-                complexityValueEl.textContent = complexity;
-                securityLevelValueEl.textContent = securityLevel;
-                databaseLevelValueEl.textContent = databaseLevel;
-                seoLevelValueEl.textContent = seoLevel;
-                integrationsLevelValueEl.textContent = integrationsLevel;
-                copywritingLevelValueEl.textContent = copywritingLevel;
-                designLevelValueEl.textContent = designLevel;
-                urgencyLevelValueEl.textContent = urgencyLevel;
-                maintenanceLevelValueEl.textContent = maintenanceLevel;
-
-                // Mostrar/ocultar opções de página baseado no tipo de projeto
-                pageTypeWrapper.style.display = projectType === 'page' ? 'block' : 'none';
-
-                updateChart({
-                    'Custo Base': baseCost,
-                    'Back-end': backendCost,
-                    'Páginas': pagesCost,
-                    'Complexidade': complexityCost,
-                    'Segurança': securityCost,
-                    'Banco de Dados': databaseCost,
-                    'SEO': seoCost,
-                    'Integrações': integrationsCost,
-                    'Copywriting': copywritingCost,
-                    'Design': designCost,
-                    'Urgência': urgencyCost,
                 });
             }
 
-            function updateChart(costBreakdown) {
+            formatCurrency(value) {
+                return new Intl.NumberFormat('pt-BR', { 
+                    style: 'currency', 
+                    currency: 'BRL',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(value);
+            }
+
+            collectFormData() {
+                return {
+                    projectType: this.elements.projectType.value,
+                    pageType: this.elements.pageType.value,
+                    backend: parseInt(this.elements.backend.value) || 0,
+                    pages: parseInt(this.elements.pages.value) || 0,
+                    complexity: parseInt(this.elements.complexity.value) || 0,
+                    includeSecurity: this.elements.includeSecurity.checked,
+                    securityLevel: parseInt(this.elements.securityLevel.value) || 0,
+                    hasDatabase: this.elements.database.checked,
+                    databaseLevel: parseInt(this.elements.databaseLevel.value) || 0,
+                    hasSeo: this.elements.seo.checked,
+                    seoLevel: parseInt(this.elements.seoLevel.value) || 0,
+                    hasIntegrations: this.elements.integrations.checked,
+                    integrationsLevel: parseInt(this.elements.integrationsLevel.value) || 0,
+                    hasCopywriting: this.elements.copywriting.checked,
+                    copywritingLevel: parseInt(this.elements.copywritingLevel.value) || 0,
+                    hasDesign: this.elements.design.checked,
+                    designLevel: parseInt(this.elements.designLevel.value) || 0,
+                    hasUrgency: this.elements.urgency.checked,
+                    urgencyLevel: parseInt(this.elements.urgencyLevel.value) || 0,
+                    hasMaintenance: this.elements.maintenance.checked,
+                    maintenanceLevel: parseInt(this.elements.maintenanceLevel.value) || 0
+                };
+            }
+
+            updateValueDisplays(data) {
+                this.elements.backendValue.textContent = data.backend;
+                this.elements.pagesValue.textContent = data.pages;
+                this.elements.complexityValue.textContent = data.complexity;
+                this.elements.securityLevelValue.textContent = data.securityLevel;
+                this.elements.databaseLevelValue.textContent = data.databaseLevel;
+                this.elements.seoLevelValue.textContent = data.seoLevel;
+                this.elements.integrationsLevelValue.textContent = data.integrationsLevel;
+                this.elements.copywritingLevelValue.textContent = data.copywritingLevel;
+                this.elements.designLevelValue.textContent = data.designLevel;
+                this.elements.urgencyLevelValue.textContent = data.urgencyLevel;
+                this.elements.maintenanceLevelValue.textContent = data.maintenanceLevel;
+            }
+
+            updateChart(breakdown) {
                 const labels = [];
                 const data = [];
-                for (const [key, value] of Object.entries(costBreakdown)) {
+                
+                for (const [key, value] of Object.entries(breakdown)) {
                     if (value > 0) {
                         labels.push(key);
                         data.push(value);
                     }
                 }
-                costChart.data.labels = labels;
-                costChart.data.datasets[0].data = data;
-                costChart.update();
+                
+                this.chart.data.labels = labels;
+                this.chart.data.datasets[0].data = data;
+                this.chart.update('active');
             }
 
-            form.addEventListener('input', calculateAndRender);
-            projectTypeEl.addEventListener('change', calculateAndRender);
-            pageTypeEl.addEventListener('change', calculateAndRender);
+            debouncedCalculate() {
+                clearTimeout(this.debounceTimer);
+                this.debounceTimer = setTimeout(() => {
+                    this.calculateAndRender();
+                }, 100); // 100ms debounce
+            }
 
-            calculateAndRender();
+            calculateAndRender() {
+                try {
+                    const projectData = this.collectFormData();
+                    const result = this.calculator.calculate(projectData);
+
+                    // Atualizar displays principais
+                    this.elements.totalValue.textContent = this.formatCurrency(result.total);
+                    this.elements.maintenanceValue.textContent = `+ ${this.formatCurrency(result.maintenanceCost)} / mês`;
+                    this.elements.maintenanceValue.style.display = projectData.hasMaintenance ? 'block' : 'none';
+
+                    // Atualizar displays dos valores
+                    this.updateValueDisplays(projectData);
+
+                    // Mostrar/ocultar opções de página
+                    this.elements.pageTypeWrapper.style.display = projectData.projectType === 'page' ? 'block' : 'none';
+
+                    // Atualizar gráfico
+                    this.updateChart(result.breakdown);
+
+                } catch (error) {
+                    console.error('Erro no cálculo:', error);
+                    this.elements.totalValue.textContent = 'Erro';
+                }
+            }
+
+            setupEventListeners() {
+                // Event listeners com debounce para performance
+                this.elements.form.addEventListener('input', () => this.debouncedCalculate());
+                this.elements.projectType.addEventListener('change', () => this.calculateAndRender());
+                this.elements.pageType.addEventListener('change', () => this.calculateAndRender());
+
+                // Listener para mudanças nos preços
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'calculatorPrices') {
+                        this.calculator.clearCache();
+                        this.calculateAndRender();
+                    }
+                });
+
+                // Botão de exportar orçamento
+                document.getElementById('exportBudgetBtn').addEventListener('click', () => {
+                    this.exportBudget();
+                });
+            }
+
+            exportBudget() {
+                try {
+                    const projectData = this.collectFormData();
+                    const summary = this.calculator.getProjectSummary(projectData);
+                    
+                    const budgetReport = {
+                        data: new Date().toLocaleDateString('pt-BR'),
+                        projeto: {
+                            tipo: this.calculator.getProjectTypeLabel(projectData.projectType),
+                            resumo: summary.features
+                        },
+                        custos: {
+                            total: summary.total,
+                            manutencao_mensal: summary.maintenance,
+                            detalhamento: Object.entries(summary.breakdown)
+                                .filter(([_, value]) => value > 0)
+                                .reduce((acc, [key, value]) => {
+                                    acc[key] = this.formatCurrency(value);
+                                    return acc;
+                                }, {})
+                        },
+                        total_formatado: this.formatCurrency(summary.total),
+                        manutencao_formatada: this.formatCurrency(summary.maintenance)
+                    };
+
+                    const dataStr = JSON.stringify(budgetReport, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(dataBlob);
+                    
+                    const timestamp = new Date().toISOString().split('T')[0];
+                    link.download = `orcamento-projeto-${timestamp}.json`;
+                    link.click();
+                    
+                    // Também criar uma versão em texto
+                    this.exportBudgetAsText(budgetReport);
+                    
+                } catch (error) {
+                    console.error('Erro ao exportar orçamento:', error);
+                    alert('Erro ao exportar orçamento. Tente novamente.');
+                }
+            }
+
+            exportBudgetAsText(budgetReport) {
+                const textContent = `
+ORÇAMENTO DE PROJETO WEB
+========================
+
+Data: ${budgetReport.data}
+Tipo de Projeto: ${budgetReport.projeto.tipo}
+
+RECURSOS INCLUSOS:
+${budgetReport.projeto.resumo.map(feature => `• ${feature}`).join('\n')}
+
+DETALHAMENTO DE CUSTOS:
+${Object.entries(budgetReport.custos.detalhamento)
+    .map(([categoria, valor]) => `${categoria}: ${valor}`)
+    .join('\n')}
+
+TOTAL DO PROJETO: ${budgetReport.total_formatado}
+${budgetReport.custos.manutencao_mensal > 0 ? 
+    `MANUTENÇÃO MENSAL: ${budgetReport.manutencao_formatada}` : ''}
+
+---
+Orçamento gerado pela Calculadora de Projetos Web
+                `.trim();
+
+                const textBlob = new Blob([textContent], { type: 'text/plain; charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(textBlob);
+                
+                const timestamp = new Date().toISOString().split('T')[0];
+                link.download = `orcamento-projeto-${timestamp}.txt`;
+                link.click();
+            }
+
+            initialize() {
+                this.initializeChart();
+                this.setupEventListeners();
+                this.calculateAndRender();
+            }
+        }
+
+        // Inicialização da aplicação
+        document.addEventListener('DOMContentLoaded', () => {
+            const calculator = new BudgetCalculator();
+            const ui = new CalculatorUI(calculator);
+            ui.initialize();
+
+            // Expor globalmente para debug (opcional)
+            window.budgetApp = { calculator, ui };
         });
     </script>
 
