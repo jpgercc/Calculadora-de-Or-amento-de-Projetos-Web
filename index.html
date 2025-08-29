@@ -6,6 +6,7 @@
     <title>Calculadora Interativa de Orçamento de Projetos</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
@@ -321,10 +322,15 @@
                             <canvas id="costChart"></canvas>
                         </div>
                     </div>
-                    <div class="mt-6 text-center">
-                        <button id="exportBudgetBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
-                            📄 Exportar Orçamento
-                        </button>
+                    <div class="mt-6 text-center space-y-3">
+                        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                            <button id="exportBudgetBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                                📄 Exportar JSON/TXT
+                            </button>
+                            <button id="exportPdfBtn" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm">
+                                📑 Exportar PDF
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -727,6 +733,11 @@
                 document.getElementById('exportBudgetBtn').addEventListener('click', () => {
                     this.exportBudget();
                 });
+
+                // Botão de exportar PDF
+                document.getElementById('exportPdfBtn').addEventListener('click', () => {
+                    this.exportBudgetAsPDF();
+                });
             }
 
             exportBudget() {
@@ -757,15 +768,13 @@
                     const dataStr = JSON.stringify(budgetReport, null, 2);
                     const dataBlob = new Blob([dataStr], { type: 'application/json' });
                     
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(dataBlob);
-                    
-                    const timestamp = new Date().toISOString().split('T')[0];
-                    link.download = `orcamento-projeto-${timestamp}.json`;
-                    link.click();
+                    // Método melhorado para download
+                    this.forceDownload(dataBlob, `orcamento-projeto-${new Date().toISOString().split('T')[0]}.json`);
                     
                     // Também criar uma versão em texto
-                    this.exportBudgetAsText(budgetReport);
+                    setTimeout(() => {
+                        this.exportBudgetAsText(budgetReport);
+                    }, 500);
                     
                 } catch (error) {
                     console.error('Erro ao exportar orçamento:', error);
@@ -798,12 +807,255 @@ Orçamento gerado pela Calculadora de Projetos Web
                 `.trim();
 
                 const textBlob = new Blob([textContent], { type: 'text/plain; charset=utf-8' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(textBlob);
                 
-                const timestamp = new Date().toISOString().split('T')[0];
-                link.download = `orcamento-projeto-${timestamp}.txt`;
-                link.click();
+                // Usar o método melhorado para download
+                this.forceDownload(textBlob, `orcamento-projeto-${new Date().toISOString().split('T')[0]}.txt`);
+            }
+
+            // Método robusto para forçar download
+            forceDownload(blob, filename) {
+                try {
+                    // Método 1: Criar link temporário e clicar
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    
+                    link.href = url;
+                    link.download = filename;
+                    
+                    // Adicionar ao DOM temporariamente para garantir que funcione em todos os navegadores
+                    document.body.appendChild(link);
+                    
+                    // Simular click
+                    link.click();
+                    
+                    // Remover do DOM
+                    document.body.removeChild(link);
+                    
+                    // Liberar memória
+                    setTimeout(() => {
+                        URL.revokeObjectURL(url);
+                    }, 1000);
+                    
+                    this.showTemporaryMessage(`Arquivo ${filename} baixado com sucesso!`, 'success');
+                    
+                } catch (error) {
+                    console.error('Erro no download:', error);
+                    
+                    // Método alternativo: Abrir em nova janela
+                    try {
+                        const url = URL.createObjectURL(blob);
+                        const newWindow = window.open(url, '_blank');
+                        
+                        if (newWindow) {
+                            this.showTemporaryMessage('Arquivo aberto em nova janela. Use Ctrl+S para salvar.', 'info');
+                        } else {
+                            throw new Error('Popup bloqueado');
+                        }
+                    } catch (altError) {
+                        this.showTemporaryMessage('Erro ao baixar arquivo. Verifique as configurações do navegador.', 'error');
+                    }
+                }
+            }
+
+            exportBudgetAsPDF() {
+                try {
+                    // Verificar se jsPDF está disponível
+                    if (typeof window.jspdf === 'undefined') {
+                        alert('Biblioteca PDF não carregada. Recarregue a página e tente novamente.');
+                        return;
+                    }
+
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    
+                    const projectData = this.collectFormData();
+                    const summary = this.calculator.getProjectSummary(projectData);
+                    
+                    // Configurações do PDF
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const margin = 20;
+                    let currentY = margin;
+
+                    // Função auxiliar para adicionar texto
+                    const addText = (text, fontSize = 12, isBold = false, color = [0, 0, 0]) => {
+                        doc.setFontSize(fontSize);
+                        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+                        doc.setTextColor(...color);
+                        
+                        if (currentY + fontSize > pageHeight - margin) {
+                            doc.addPage();
+                            currentY = margin;
+                        }
+                        
+                        doc.text(text, margin, currentY);
+                        currentY += fontSize + 5;
+                    };
+
+                    // Cabeçalho
+                    addText('ORÇAMENTO DE PROJETO WEB', 20, true, [0, 102, 136]);
+                    currentY += 10;
+
+                    // Informações básicas
+                    const currentDate = new Date().toLocaleDateString('pt-BR');
+                    addText(`Data: ${currentDate}`, 12);
+                    addText(`Tipo de Projeto: ${this.calculator.getProjectTypeLabel(projectData.projectType)}`, 12, true);
+                    currentY += 5;
+
+                    // Recursos inclusos
+                    if (summary.features.length > 0) {
+                        addText('RECURSOS INCLUSOS:', 14, true);
+                        summary.features.forEach(feature => {
+                            addText(`• ${feature}`, 11);
+                        });
+                        currentY += 10;
+                    }
+
+                    // Detalhamento de custos
+                    addText('DETALHAMENTO DE CUSTOS:', 14, true);
+                    currentY += 5;
+
+                    // Linha horizontal
+                    doc.setDrawColor(200, 200, 200);
+                    doc.line(margin, currentY, pageWidth - margin, currentY);
+                    currentY += 10;
+
+                    // Tabela de custos
+                    const costEntries = Object.entries(summary.breakdown)
+                        .filter(([_, value]) => value > 0)
+                        .sort(([_, a], [__, b]) => b - a);
+
+                    costEntries.forEach(([categoria, valor]) => {
+                        const valorFormatado = this.formatCurrency(valor);
+                        
+                        if (currentY + 15 > pageHeight - margin) {
+                            doc.addPage();
+                            currentY = margin;
+                        }
+                        
+                        // Categoria
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(11);
+                        doc.setTextColor(0, 0, 0);
+                        doc.text(categoria, margin, currentY);
+                        
+                        // Valor alinhado à direita
+                        doc.setFont('helvetica', 'bold');
+                        const textWidth = doc.getTextWidth(valorFormatado);
+                        doc.text(valorFormatado, pageWidth - margin - textWidth, currentY);
+                        
+                        currentY += 15;
+                    });
+
+                    // Linha total
+                    currentY += 5;
+                    doc.line(margin, currentY, pageWidth - margin, currentY);
+                    currentY += 15;
+
+                    // Total
+                    doc.setFontSize(16);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(0, 102, 136);
+                    
+                    const totalText = 'TOTAL DO PROJETO:';
+                    const totalValue = this.formatCurrency(summary.total);
+                    
+                    doc.text(totalText, margin, currentY);
+                    const totalValueWidth = doc.getTextWidth(totalValue);
+                    doc.text(totalValue, pageWidth - margin - totalValueWidth, currentY);
+                    currentY += 20;
+
+                    // Manutenção (se aplicável)
+                    if (summary.maintenance > 0) {
+                        doc.setFontSize(14);
+                        doc.setTextColor(180, 83, 9);
+                        
+                        const maintenanceText = 'MANUTENÇÃO MENSAL:';
+                        const maintenanceValue = this.formatCurrency(summary.maintenance);
+                        
+                        doc.text(maintenanceText, margin, currentY);
+                        const maintenanceValueWidth = doc.getTextWidth(maintenanceValue);
+                        doc.text(maintenanceValue, pageWidth - margin - maintenanceValueWidth, currentY);
+                        currentY += 20;
+                    }
+
+                    // Observações
+                    currentY += 10;
+                    doc.line(margin, currentY, pageWidth - margin, currentY);
+                    currentY += 15;
+                    
+                    doc.setFontSize(12);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(0, 0, 0);
+                    doc.text('OBSERVAÇÕES:', margin, currentY);
+                    currentY += 15;
+                    
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(10);
+                    const observations = [
+                        '• Este orçamento tem validade de 30 dias.',
+                        '• Os valores podem sofrer alterações dependendo de mudanças no escopo.',
+                        '• O projeto será iniciado mediante aprovação e sinal de 50%.'
+                    ];
+                    
+                    observations.forEach(obs => {
+                        if (currentY + 12 > pageHeight - 40) {
+                            doc.addPage();
+                            currentY = margin;
+                        }
+                        doc.text(obs, margin, currentY);
+                        currentY += 12;
+                    });
+
+                    // Rodapé
+                    const footerY = pageHeight - 30;
+                    doc.setFontSize(8);
+                    doc.setTextColor(128, 128, 128);
+                    
+                    const footerText = 'Orçamento gerado pela Calculadora de Projetos Web';
+                    const footerWidth = doc.getTextWidth(footerText);
+                    doc.text(footerText, (pageWidth - footerWidth) / 2, footerY);
+                    
+                    const generatedText = `Gerado em: ${new Date().toLocaleString('pt-BR')}`;
+                    const generatedWidth = doc.getTextWidth(generatedText);
+                    doc.text(generatedText, (pageWidth - generatedWidth) / 2, footerY + 10);
+
+                    // Salvar o PDF
+                    const timestamp = new Date().toISOString().split('T')[0];
+                    const filename = `orcamento-projeto-${timestamp}.pdf`;
+                    
+                    // Força o download
+                    doc.save(filename);
+                    
+                    // Feedback visual
+                    this.showTemporaryMessage('PDF gerado com sucesso!', 'success');
+
+                } catch (error) {
+                    console.error('Erro ao gerar PDF:', error);
+                    alert(`Erro ao gerar PDF: ${error.message}`);
+                }
+            }
+
+            // Função auxiliar para mostrar mensagens temporárias
+            showTemporaryMessage(message, type = 'info') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `fixed top-4 left-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white transition-all duration-300 ${
+                    type === 'success' ? 'bg-green-500' : 
+                    type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                }`;
+                messageDiv.textContent = message;
+                
+                document.body.appendChild(messageDiv);
+                
+                setTimeout(() => {
+                    messageDiv.style.opacity = '0';
+                    messageDiv.style.transform = 'translateY(-20px)';
+                    setTimeout(() => {
+                        if (document.body.contains(messageDiv)) {
+                            document.body.removeChild(messageDiv);
+                        }
+                    }, 300);
+                }, 3000);
             }
 
             initialize() {
